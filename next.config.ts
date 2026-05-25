@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Keep Puppeteer (and its Chromium) out of the bundle — load at runtime.
-  serverExternalPackages: ["puppeteer"],
+  // Keep the headless-Chromium packages out of the bundle — loaded at runtime.
+  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"],
 };
 
 export default nextConfig;

@@ -19,9 +19,18 @@ const PROTECTED_PREFIXES = [
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // If Supabase env vars are missing, don't crash every route — skip the
+  // session refresh and let pages render (auth simply won't work until set).
+  if (!url || !anonKey) {
+    console.warn("[proxy] Supabase env vars missing — skipping session refresh.");
+    return response;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {
