@@ -1,0 +1,13 @@
+import { create } from "zustand";
+import type { User } from "@supabase/supabase-js";
+
+interface AuthState {
+  user: User | null;
+  setUser: (user: User | null) => void;
+}
+
+/** Client-side snapshot of the auth user. Source of truth remains Supabase. */
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  setUser: (user) => set({ user }),
+}));
