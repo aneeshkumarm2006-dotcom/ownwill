@@ -55,7 +55,7 @@ export function AppPage({
               <p className="t-body muted" style={{ margin: 0 }}>{description}</p>
             </div>
           )}
-          <div className={cls("ow-page-grid", !!rail && "has-rail", narrow && "is-narrow", !wide && "is-centered", description && "has-description")}>
+          <div className={cls("ow-page-grid", !!rail && "has-rail", narrow && "is-narrow", !wide && "is-centered", !!description && "has-description")}>
             <div className="ow-page-body">{children}</div>
             {rail && <aside className="ow-page-rail">{rail}</aside>}
           </div>
