@@ -23,9 +23,17 @@ export async function createClient() {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options),
             );
-          } catch {
-            // `setAll` was called from a Server Component. This can be ignored
-            // when the session is refreshed by the proxy (see proxy.ts).
+          } catch (err) {
+            // `setAll` from a Server Component throws because cookies are
+            // read-only there; that's expected and safe when the proxy
+            // (see proxy.ts) refreshes the session on the next request.
+            // Anything else is worth surfacing so we don't lose a real bug
+            // (e.g. a route handler hitting an unrelated cookie error).
+            const message = err instanceof Error ? err.message : String(err);
+            const names = cookiesToSet.map((c) => c.name).join(", ");
+            console.warn(
+              `[supabase/server] setAll skipped (likely Server Component) — cookies: ${names}; reason: ${message}`,
+            );
           }
         },
       },

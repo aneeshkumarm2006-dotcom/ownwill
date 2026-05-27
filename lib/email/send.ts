@@ -22,7 +22,7 @@ export async function sendEmail({
   const secretAccessKey = process.env.AWS_SES_SECRET_KEY;
   const region = process.env.AWS_SES_REGION;
 
-  if (!accessKeyId || !secretAccessKey || !region) {
+  if (!accessKeyId?.length || !secretAccessKey?.length || !region?.length) {
     console.log(`[email skipped — SES not configured] to=${to} subject="${subject}"`);
     return { ok: false, skipped: true };
   }

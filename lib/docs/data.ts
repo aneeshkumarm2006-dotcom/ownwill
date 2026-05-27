@@ -29,7 +29,7 @@ export async function getOrCreateDoc(
     .eq("user_id", args.userId)
     .eq("type", args.type)
     .eq("is_current", true)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (docErr) throw docErr;
@@ -48,7 +48,7 @@ export async function getOrCreateDoc(
     .from(args.table)
     .select("*")
     .eq("document_id", doc.id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (rowErr) throw rowErr;
@@ -103,7 +103,7 @@ export async function loadDoc(
     .eq("user_id", args.userId)
     .eq("type", args.type)
     .eq("is_current", true)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!doc) return null;
@@ -112,7 +112,7 @@ export async function loadDoc(
     .from(args.table)
     .select("*")
     .eq("document_id", doc.id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!row) return null;

@@ -6,6 +6,13 @@ import {
   type WillForm,
 } from "@/types/will";
 import type { Province } from "@/types";
+import {
+  parseBeneficiaries,
+  parseCharitableDonations,
+  parseChildren,
+  parsePets,
+  parseSpecificGifts,
+} from "@/lib/validation/will";
 
 /**
  * IMPORTANT — column-name assumptions.
@@ -90,7 +97,6 @@ function toRow(form: WillForm): Row {
 }
 
 function fromRow(row: Row): WillForm {
-  const arr = <T,>(k: string): T[] => (Array.isArray(row[k]) ? (row[k] as T[]) : []);
   return {
     full_legal_name: (row.full_legal_name as string) ?? "",
     date_of_birth: (row.date_of_birth as string) ?? "",
@@ -99,15 +105,15 @@ function fromRow(row: Row): WillForm {
     marital_status: (row.marital_status as WillForm["marital_status"]) ?? "",
     executor: personFromRow("executor", row),
     backup_executor: personFromRow("backup_executor", row),
-    beneficiaries: arr("beneficiaries"),
-    children: arr("children"),
+    beneficiaries: parseBeneficiaries(row.beneficiaries),
+    children: parseChildren(row.children),
     guardian: personFromRow("child_guardian", row),
     backup_guardian: personFromRow("backup_guardian", row),
-    pets: arr("pets"),
+    pets: parsePets(row.pets),
     pet_guardian: personFromRow("pet_guardian", row),
     pet_care_fund: (row.pet_care_fund as number | null) ?? null,
-    specific_gifts: arr("specific_gifts"),
-    charitable_donations: arr("charitable_donations"),
+    specific_gifts: parseSpecificGifts(row.specific_gifts),
+    charitable_donations: parseCharitableDonations(row.charitable_donations),
     funeral_wishes: (row.funeral_wishes as string) ?? "",
     business_interests: (row.business_interests as string) ?? "",
   };

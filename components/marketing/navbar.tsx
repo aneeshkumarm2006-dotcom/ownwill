@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
@@ -21,11 +21,79 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const overHero = OVER_HERO.includes(pathname);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const burgerRef = useRef<HTMLButtonElement | null>(null);
+
+  // Close on route change so the dialog never lingers after navigation.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Mobile menu: Esc-to-close, focus trap, restore focus to the trigger.
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const focusables = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((el) => !el.hasAttribute("aria-hidden"));
+
+    focusables()[0]?.focus();
+
+    const prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMobileOpen(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevBodyOverflow;
+      (previouslyFocused ?? burgerRef.current)?.focus();
+    };
+  }, [mobileOpen]);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
+    // Only flip state when the scroll position crosses the 40px threshold,
+    // so we don't queue a React render for every scroll tick.
+    const evaluate = () => setScrolled((prev) => {
+      const next = window.scrollY > 40;
+      return prev === next ? prev : next;
+    });
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        evaluate();
+        ticking = false;
+      });
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
+    evaluate();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -63,14 +131,27 @@ export function Navbar() {
               Get started
             </Button>
           </div>
-          <button className="btn btn-ghost btn-icon nav-burger" aria-label="Menu" onClick={() => setMobileOpen(true)}>
+          <button
+            ref={burgerRef}
+            className="btn btn-ghost btn-icon nav-burger"
+            aria-label="Open menu"
+            aria-haspopup="dialog"
+            aria-expanded={mobileOpen}
+            onClick={() => setMobileOpen(true)}
+          >
             <Menu />
           </button>
         </nav>
       </div>
 
       {mobileOpen && (
-        <div style={{ position: "fixed", inset: 0, background: "var(--background)", zIndex: 60, padding: 24, animation: "ow-fade 240ms var(--ease-std)" }}>
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Site navigation"
+          style={{ position: "fixed", inset: 0, background: "var(--background)", zIndex: 60, padding: 24, animation: "ow-fade 240ms var(--ease-std)" }}
+        >
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 32 }}>
             <Wordmark />
             <button className="btn btn-ghost btn-icon" onClick={() => setMobileOpen(false)} aria-label="Close menu">

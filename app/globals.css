@@ -290,6 +290,18 @@
 /* Focus ring helper */
 .focusable:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--r-md); }
 
+/* Skip-to-content link — visually hidden until focused via keyboard. */
+.skip-link {
+  position: absolute; left: 12px; top: -40px; z-index: 100;
+  padding: 8px 14px; border-radius: var(--r-md);
+  background: var(--primary); color: var(--primary-foreground);
+  font-size: 14px; font-weight: 600; text-decoration: none;
+  transition: top 160ms var(--ease-emph);
+}
+.skip-link:focus, .skip-link:focus-visible {
+  top: 12px; outline: none; box-shadow: var(--focus-ring);
+}
+
 /* Link */
 .link { color: var(--primary); text-decoration: none; }
 .link:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -351,9 +363,17 @@
 .dark .reverse { background: #061211; }
 .reverse .muted { color: #B7C5C1; }
 
-/* Reduced motion */
+/* Reduced motion — honour the OS-level "Reduce motion" preference everywhere.
+   Covers CSS animations/transitions, smooth scrolling, and the looping
+   illustration keyframes (mg-*) used by components/illustrations.tsx. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 120ms !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+    scroll-behavior: auto !important;
+  }
+  [class*="mg-"] { animation: none !important; }
 }
 
 /* Scrollbar polish */

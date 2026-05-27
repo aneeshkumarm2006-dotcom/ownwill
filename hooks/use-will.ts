@@ -6,6 +6,32 @@ import { createClient } from "@/lib/supabase/client";
 import { getOrCreateWill, saveWill } from "@/lib/will/data";
 import { useWillStore } from "@/store/will";
 
+/**
+ * Map a Supabase / Postgres error code to a friendly message. Falls back to the
+ * raw error message (or a generic line) when the code is unknown.
+ */
+function describeLoadError(e: unknown): string {
+  const err = e as { code?: string; message?: string } | null;
+  switch (err?.code) {
+    case "PGRST301":
+    case "401":
+      return "Your session has expired. Please sign in again.";
+    case "42501":
+      return "You don't have permission to access this will.";
+    case "23503":
+      return "Your account is missing some setup. Refresh the page or sign in again.";
+    case "PGRST116":
+      return "We couldn't find your will. Please try again.";
+    case "23505":
+      return "A conflicting will already exists for this account.";
+    case "FETCH_ERROR":
+    case "NETWORK_ERROR":
+      return "Couldn't reach the server. Check your connection and try again.";
+  }
+  if (err?.message) return err.message;
+  return "Failed to load your will.";
+}
+
 /** Loads (or creates) the user's will into the store once, on mount. */
 export function useWillLoader() {
   const [supabase] = useState(() => createClient());
@@ -36,7 +62,7 @@ export function useWillLoader() {
         }
       } catch (e) {
         if (active) {
-          setError(e instanceof Error ? e.message : "Failed to load your will.");
+          setError(describeLoadError(e));
         }
       }
     })();

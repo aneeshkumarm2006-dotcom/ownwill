@@ -1,4 +1,4 @@
-import { PROVINCE_NAMES, type Province } from "@/types";
+import { PROVINCE_NAMES, type DocumentType, type Province } from "@/types";
 import { beneficiaryTotal, hasPerson, personName, type WillForm } from "@/types/will";
 import type { DocData } from "@/lib/docs/data";
 
@@ -12,7 +12,7 @@ function flatName(d: DocData, prefix: string) {
   return [d[`${prefix}_first_name`], d[`${prefix}_last_name`]].filter(Boolean).join(" ").trim();
 }
 
-export const DOCUMENT_TITLES: Record<string, { title: string; subtitlePrefix: string }> = {
+export const DOCUMENT_TITLES: Record<DocumentType, { title: string; subtitlePrefix: string }> = {
   will: { title: "Last Will and Testament", subtitlePrefix: "of" },
   poa_health: { title: "Power of Attorney for Personal Care", subtitlePrefix: "of" },
   poa_property: { title: "Continuing Power of Attorney for Property", subtitlePrefix: "of" },
@@ -168,7 +168,7 @@ function assetListBody(d: DocData, ownerName: string): string {
 }
 
 /** Renders a full document (letterhead + body + footer) as an HTML string. */
-export function renderDocument(type: string, data: WillForm | DocData, ownerName = ""): string {
+export function renderDocument(type: DocumentType, data: WillForm | DocData, ownerName = ""): string {
   const meta = DOCUMENT_TITLES[type] ?? { title: "Document", subtitlePrefix: "of" };
   const name = type === "will"
     ? (data as WillForm).full_legal_name || ownerName

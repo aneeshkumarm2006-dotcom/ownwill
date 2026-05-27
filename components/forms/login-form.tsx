@@ -7,6 +7,14 @@ import { Eye, EyeOff, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Field, Input } from "@/components/ui-kit";
 import { AuthShell, AuthHeader } from "@/components/auth/auth-shell";
+import { isValidEmail } from "@/lib/validation/email";
+
+// Accept only same-origin paths: must start with "/" but not "//" (protocol-relative).
+// Blocks open-redirect payloads like `//attacker.com` or `/\\attacker.com`.
+function safeRedirect(value: string | null): string {
+  if (!value) return "/dashboard";
+  return /^\/(?!\/)/.test(value) ? value : "/dashboard";
+}
 
 function GoogleIcon() {
   return (
@@ -32,7 +40,7 @@ export function LoginForm() {
   async function handleGoogleSignIn() {
     setGoogleLoading(true);
     const supabase = createClient();
-    const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+    const redirectTo = safeRedirect(searchParams.get("redirectTo"));
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -48,7 +56,7 @@ export function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs: typeof errors = {};
-    if (!email.includes("@")) errs.email = "Please enter a valid email.";
+    if (!isValidEmail(email)) errs.email = "Please enter a valid email.";
     if (!password) errs.password = "Password is required.";
     setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -61,7 +69,7 @@ export function LoginForm() {
       toast.error(error.message);
       return;
     }
-    const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+    const redirectTo = safeRedirect(searchParams.get("redirectTo"));
     router.push(redirectTo);
     router.refresh();
   }
@@ -85,8 +93,15 @@ export function LoginForm() {
           <Field label="Password" error={errors.password} htmlFor="pw">
             <div style={{ position: "relative" }}>
               <Input id="pw" type={showPw ? "text" : "password"} placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ paddingRight: 44 }} />
-              <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? "Hide password" : "Show password"} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: "var(--muted-foreground)", cursor: "pointer", padding: 8 }}>
-                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                aria-label={showPw ? "Hide password" : "Show password"}
+                aria-pressed={showPw}
+                aria-controls="pw"
+                style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: "var(--muted-foreground)", cursor: "pointer", padding: 8 }}
+              >
+                {showPw ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
               </button>
             </div>
           </Field>

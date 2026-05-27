@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppShell } from "@/components/app/app-shell";
+import { Alert } from "@/components/ui-kit";
 import type { ShellUser } from "@/components/app/shell-context";
 
 export default async function AppLayout({
@@ -31,12 +32,22 @@ export default async function AppLayout({
   // Self-heal: create the profile if it's missing (e.g. user predates the
   // signup trigger). The FK from documents -> profiles needs this to exist.
   if (!profile) {
-    await supabase.from("profiles").insert({
+    const { error: insertError } = await supabase.from("profiles").insert({
       id: user.id,
       email: user.email,
       full_name: fullName,
       province,
     });
+    if (insertError) {
+      return (
+        <main style={{ maxWidth: 560, margin: "80px auto", padding: 24 }}>
+          <Alert variant="error" title="We couldn't set up your account">
+            Something went wrong creating your profile. Please refresh, or sign
+            out and back in. If the problem persists, contact support.
+          </Alert>
+        </main>
+      );
+    }
     const { data: created } = await supabase
       .from("profiles")
       .select("plan, full_name, province")

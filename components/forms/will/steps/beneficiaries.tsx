@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Field } from "@/components/forms/will/field";
@@ -14,7 +15,7 @@ import {
 export function BeneficiariesStep() {
   const data = useWillStore((s) => s.data);
   const patch = useWillStore((s) => s.patch);
-  const total = beneficiaryTotal(data.beneficiaries);
+  const total = useMemo(() => beneficiaryTotal(data.beneficiaries), [data.beneficiaries]);
 
   return (
     <div className="space-y-4">
@@ -67,7 +68,15 @@ export function BeneficiariesStep() {
               : "text-sm text-destructive"
           }
         >
-          Total: {total}% {total === 100 ? "✓" : "— must equal 100%"}
+          Total: {total}%{" "}
+          {total === 100 ? (
+            <>
+              <span aria-hidden="true">✓</span>
+              <span className="sr-only">Valid</span>
+            </>
+          ) : (
+            "— must equal 100%"
+          )}
         </p>
       ) : null}
     </div>

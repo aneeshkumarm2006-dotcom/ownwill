@@ -10,7 +10,10 @@ import { Dropdown } from "@/components/ui/dropdown";
 import { AuthShell, AuthHeader } from "@/components/auth/auth-shell";
 import { MailboxIllo } from "@/components/illustrations";
 import { passwordStrength, STRENGTH_LABELS } from "@/lib/password";
-import { PROVINCE_OPTIONS, type Province } from "@/types";
+import { PROVINCES, PROVINCE_OPTIONS, type Province } from "@/types";
+import { isValidEmail } from "@/lib/validation/email";
+
+const FULL_NAME_MAX = 120;
 
 const STRENGTH_COLOR = (s: number) =>
   s < 2 ? "var(--destructive)" : s < 3 ? "var(--warning)" : "var(--success)";
@@ -57,10 +60,13 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!fullName.trim()) errs.fullName = "Please enter your legal name.";
-    if (!email.includes("@")) errs.email = "Please enter a valid email.";
+    const cleanName = fullName.trim().slice(0, FULL_NAME_MAX);
+    if (!cleanName) errs.fullName = "Please enter your legal name.";
+    if (!isValidEmail(email)) errs.email = "Please enter a valid email.";
     if (password.length < 8) errs.password = "Use at least 8 characters.";
-    if (!province) errs.province = "Choose your province.";
+    if (!province || !PROVINCES.includes(province as Province)) {
+      errs.province = "Choose your province.";
+    }
     if (!agree) errs.agree = "Please agree to continue.";
     setErrors(errs);
     if (Object.keys(errs).length) return;
@@ -71,7 +77,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        data: { full_name: fullName, province },
+        data: { full_name: cleanName, province },
         emailRedirectTo: `${window.location.origin}/verify-email`,
       },
     });

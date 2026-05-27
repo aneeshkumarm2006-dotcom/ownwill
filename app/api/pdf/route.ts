@@ -1,15 +1,22 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOrCreateWill } from "@/lib/will/data";
 import { loadDoc } from "@/lib/docs/data";
-import { renderDocument, DOCUMENT_CSS, DOCUMENT_TITLES } from "@/lib/docs/document";
-import { renderPdf } from "@/lib/pdf/render";
+import { renderDocument, DOCUMENT_CSS } from "@/lib/docs/document";
+import { renderPdf, PdfTimeoutError } from "@/lib/pdf/render";
+import { rateLimit } from "@/lib/rate-limit";
+import { PdfRequestSchema, type DocumentTypeValue } from "@/lib/validation/api";
+import { apiOk, apiError } from "@/lib/api/response";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const TABLE: Record<string, string> = {
+const MAX_BODY_BYTES = 5 * 1024 * 1024;
+const RATE_LIMIT_PER_USER = 20;
+const RATE_WINDOW_MS = 60 * 60 * 1000;
+
+const TABLE: Record<Exclude<DocumentTypeValue, "will">, string> = {
   poa_health: "poa_health_data",
   poa_property: "poa_property_data",
   asset_list: "asset_list_data",
@@ -22,16 +29,29 @@ const TABLE: Record<string, string> = {
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return apiError("Unauthorized", 401);
 
-  let type = "will";
+  const contentLength = Number(req.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    return apiError("Payload too large", 413);
+  }
+
+  const limit = rateLimit(`pdf:${user.id}`, RATE_LIMIT_PER_USER, RATE_WINDOW_MS);
+  if (!limit.ok) {
+    return apiError("Too many requests. Try again later.", 429, {
+      headers: { "Retry-After": String(limit.retryAfterSeconds) },
+    });
+  }
+
+  let raw: unknown = {};
   try {
-    const body = await req.json();
-    if (body?.type) type = String(body.type);
+    raw = await req.json();
   } catch {
     // no body → default to will
   }
-  if (!DOCUMENT_TITLES[type]) return NextResponse.json({ error: "Unknown document type" }, { status: 400 });
+  const parsed = PdfRequestSchema.safeParse(raw);
+  if (!parsed.success) return apiError("Unknown document type", 400);
+  const type: DocumentTypeValue = parsed.data.type ?? "will";
 
   const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
   const ownerName = (profile?.full_name as string) ?? (user.user_metadata?.full_name as string) ?? "";
@@ -50,10 +70,10 @@ export async function POST(req: NextRequest) {
       .eq("user_id", user.id)
       .eq("type", type)
       .eq("is_current", true)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (!doc) return NextResponse.json({ error: "This document hasn't been started yet." }, { status: 400 });
+    if (!doc) return apiError("This document hasn't been started yet.", 400);
     documentId = doc.id as string;
     const data = await loadDoc(supabase, { userId: user.id, type, table: TABLE[type] });
     html = renderDocument(type, data ?? {}, ownerName);
@@ -65,9 +85,15 @@ export async function POST(req: NextRequest) {
   try {
     pdf = await renderPdf(fullHtml);
   } catch (e) {
-    return NextResponse.json(
-      { error: `PDF engine failed: ${e instanceof Error ? e.message : "unknown"}. Use the print view instead.` },
-      { status: 500 },
+    if (e instanceof PdfTimeoutError) {
+      return apiError(
+        "Generating your PDF is taking longer than expected. Please try again, or use the print view in the meantime.",
+        504,
+      );
+    }
+    return apiError(
+      `PDF engine failed: ${e instanceof Error ? e.message : "unknown"}. Use the print view instead.`,
+      500,
     );
   }
 
@@ -76,7 +102,7 @@ export async function POST(req: NextRequest) {
   const { error: upErr } = await admin.storage
     .from("documents")
     .upload(path, pdf, { contentType: "application/pdf", upsert: true });
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+  if (upErr) return apiError(upErr.message, 500);
 
   const { data: pub } = admin.storage.from("documents").getPublicUrl(path);
   await admin
@@ -84,5 +110,5 @@ export async function POST(req: NextRequest) {
     .update({ pdf_url: pub.publicUrl, pdf_generated_at: new Date().toISOString(), status: "generated" })
     .eq("id", documentId);
 
-  return NextResponse.json({ url: pub.publicUrl });
+  return apiOk({ url: pub.publicUrl });
 }

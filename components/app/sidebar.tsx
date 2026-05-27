@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { LeafMark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui-kit";
@@ -75,10 +76,18 @@ function SidebarFooter({ user, onNavigate }: { user: ShellUser; onNavigate?: () 
     .toUpperCase();
 
   async function signOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast.error(error.message || "Couldn't sign out. Please try again.");
+        return;
+      }
+      router.push("/login");
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't sign out. Please try again.");
+    }
   }
 
   return (
@@ -89,7 +98,7 @@ function SidebarFooter({ user, onNavigate }: { user: ShellUser; onNavigate?: () 
         <ArrowRight size={14} style={{ color: "var(--muted-foreground)" }} />
       </Link>
       <div style={{ position: "relative" }}>
-        <button className="ow-side-user-btn focusable" onClick={() => setMenuOpen(!menuOpen)} aria-haspopup="menu" aria-expanded={menuOpen}>
+        <button className="ow-side-user-btn focusable" onClick={() => setMenuOpen(!menuOpen)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label="Open user menu">
           <span className="avatar" style={{ flex: "none" }}>{initials}</span>
           <span className="ow-side-user-meta">
             <span className="ow-side-user-name">{user.fullName || "You"}</span>
@@ -101,8 +110,13 @@ function SidebarFooter({ user, onNavigate }: { user: ShellUser; onNavigate?: () 
           <>
             <div style={{ position: "fixed", inset: 0, zIndex: 30 }} onClick={() => setMenuOpen(false)} />
             <div className="ow-side-menu card" role="menu">
-              <button className="ow-side-menu-item" onClick={() => setTheme(isDark ? "light" : "dark")}>
-                {isDark ? <Sun size={16} /> : <Moon size={16} />}
+              <button
+                className="ow-side-menu-item"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                aria-label="Toggle theme"
+                aria-pressed={isDark}
+              >
+                {isDark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
                 <span>{isDark ? "Light mode" : "Dark mode"}</span>
               </button>
               <Link href="/profile" className="ow-side-menu-item" onClick={() => { setMenuOpen(false); onNavigate?.(); }}>

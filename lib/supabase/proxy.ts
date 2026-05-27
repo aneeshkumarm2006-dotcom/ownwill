@@ -9,6 +9,11 @@ const PROTECTED_PREFIXES = [
   "/poa-property",
   "/assets",
   "/payment",
+  "/billing",
+  "/review",
+  "/signing",
+  "/documents",
+  "/help",
 ];
 
 /**
@@ -21,11 +26,19 @@ export async function updateSession(request: NextRequest) {
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  // If Supabase env vars are missing, don't crash every route — skip the
-  // session refresh and let pages render (auth simply won't work until set).
   if (!url || !anonKey) {
-    console.warn("[proxy] Supabase env vars missing — skipping session refresh.");
-    return response;
+    // Dev: fail loud so the misconfiguration is impossible to miss.
+    // Prod: surface a 500 — silently skipping auth would expose protected
+    // routes to anyone (every request would see `user = null` and the
+    // protected-prefix check below would still redirect, but downstream
+    // server code that trusts cookies/session would be broken).
+    if (process.env.NODE_ENV !== "production") {
+      throw new Error(
+        "[proxy] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      );
+    }
+    console.error("[proxy] Supabase env vars missing — returning 500.");
+    return new NextResponse("Server misconfigured", { status: 500 });
   }
 
   const supabase = createServerClient(
@@ -56,7 +69,10 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  // Exact match or trailing-slash match only — so "/willx" doesn't match "/will".
+  const isProtected = PROTECTED_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

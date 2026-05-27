@@ -7,14 +7,21 @@ import { createClient } from "@/lib/supabase/client";
 import { Button, Field, Input } from "@/components/ui-kit";
 import { AuthShell, AuthHeader } from "@/components/auth/auth-shell";
 import { MailboxIllo } from "@/components/illustrations";
+import { isValidEmail } from "@/lib/validation/email";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState<string | undefined>();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isValidEmail(email)) {
+      setEmailError("Please enter a valid email.");
+      return;
+    }
+    setEmailError(undefined);
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -33,7 +40,7 @@ export default function ForgotPasswordPage() {
       <AuthHeader title="Forgot your password?" subtitle="No worries — we'll email you a reset link." />
       {!sent ? (
         <form className="stack g-4" onSubmit={handleSubmit}>
-          <Field label="Email">
+          <Field label="Email" error={emailError}>
             <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} leadingIcon={<Mail size={16} />} />
           </Field>
           <Button type="submit" size="lg" className="btn-block" loading={loading}>Send reset link</Button>

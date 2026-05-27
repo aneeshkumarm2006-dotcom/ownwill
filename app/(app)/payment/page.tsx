@@ -47,12 +47,13 @@ export default function PaymentPage() {
     if (Object.keys(errs).length) return;
     setLoading(true);
     // TEST MODE — no real charge. Activate the plan + mark the will generated.
-    const { error } = await completeWillPurchase(plan as "essentials" | "premium" | "premium_x2");
+    const { error, warning } = await completeWillPurchase(plan as "essentials" | "premium" | "premium_x2");
     setLoading(false);
     if (error) {
       toast.error(error);
       return;
     }
+    if (warning) toast.warning(warning);
     toast.success("Payment successful — generating your will.");
     router.push("/download");
   }

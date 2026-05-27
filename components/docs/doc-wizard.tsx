@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
@@ -36,7 +36,7 @@ export interface DocWizardConfig {
 
 export function DocWizard({ config }: { config: DocWizardConfig }) {
   const router = useRouter();
-  const [supabase] = useState(() => createClient());
+  const supabase = useMemo(() => createClient(), []);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<DocData>(config.defaults);
@@ -122,7 +122,10 @@ export function DocWizard({ config }: { config: DocWizardConfig }) {
 
   async function handleNext() {
     const err = config.validate?.(currentStep, data);
-    if (err) return toast.error(err);
+    if (err) {
+      toast.error(err);
+      return;
+    }
     await persist(currentStep + 1, false);
   }
   async function handleBack() {
@@ -134,7 +137,10 @@ export function DocWizard({ config }: { config: DocWizardConfig }) {
   async function handleFinish() {
     for (let s = 1; s <= total; s++) {
       const err = config.validate?.(s, data);
-      if (err) return toast.error(err);
+      if (err) {
+        toast.error(err);
+        return;
+      }
     }
     await persist(currentStep, true);
     toast.success("Saved.");

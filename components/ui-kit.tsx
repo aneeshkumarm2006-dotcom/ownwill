@@ -4,6 +4,9 @@ import Link from "next/link";
 import {
   useEffect,
   useState,
+  type AnchorHTMLAttributes,
+  type ButtonHTMLAttributes,
+  type HTMLAttributes,
   type ReactNode,
   type InputHTMLAttributes,
   type SelectHTMLAttributes,
@@ -34,8 +37,22 @@ export function Spinner({ size = 16 }: { size?: number }) {
 type ButtonVariant =
   | "primary" | "secondary" | "outline" | "ghost" | "cta" | "destructive" | "link";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyProps = Record<string, any>;
+type ButtonOwnProps = {
+  variant?: ButtonVariant;
+  size?: "default" | "sm" | "lg" | "icon";
+  href?: string;
+  icon?: ReactNode;
+  iconRight?: ReactNode;
+  loading?: boolean;
+  children?: ReactNode;
+  className?: string;
+};
+
+type ButtonProps = ButtonOwnProps &
+  Omit<
+    ButtonHTMLAttributes<HTMLButtonElement> & AnchorHTMLAttributes<HTMLAnchorElement>,
+    keyof ButtonOwnProps
+  >;
 
 export function Button({
   variant = "primary",
@@ -47,16 +64,7 @@ export function Button({
   children,
   className,
   ...rest
-}: {
-  variant?: ButtonVariant;
-  size?: "default" | "sm" | "lg" | "icon";
-  href?: string;
-  icon?: ReactNode;
-  iconRight?: ReactNode;
-  loading?: boolean;
-  children?: ReactNode;
-  className?: string;
-} & AnyProps) {
+}: ButtonProps) {
   const sizeCls =
     size === "sm" ? "btn-sm" : size === "lg" ? "btn-lg" : size === "icon" ? "btn-icon" : "";
   const classes = cls("btn", `btn-${variant}`, sizeCls, className);
@@ -93,7 +101,7 @@ export function Card({
   className?: string;
   padded?: boolean;
   interactive?: boolean;
-} & AnyProps) {
+} & Omit<HTMLAttributes<HTMLDivElement>, "children" | "className">) {
   return (
     <div className={cls("card", padded && "card-pad", interactive && "card-interactive", className)} {...rest}>
       {children}
@@ -112,7 +120,7 @@ export function Badge({
   children?: ReactNode;
   icon?: ReactNode;
   className?: string;
-} & AnyProps) {
+} & Omit<HTMLAttributes<HTMLSpanElement>, "children" | "className">) {
   return (
     <span className={cls("badge", `badge-${variant}`, className)} {...rest}>
       {icon}

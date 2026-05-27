@@ -37,8 +37,13 @@ function validateStep(step: number, data: WillForm): string | null {
     if (!data.full_legal_name.trim()) return "Please enter your full legal name.";
     if (!data.province) return "Please select your province.";
   }
-  if (step === 3 && data.beneficiaries.length > 0 && beneficiaryTotal(data.beneficiaries) !== 100) {
-    return "Beneficiary percentages must add up to 100%.";
+  if (step === 3) {
+    if (data.beneficiaries.length === 0) {
+      return "Add at least one beneficiary before continuing.";
+    }
+    if (beneficiaryTotal(data.beneficiaries) !== 100) {
+      return "Beneficiary percentages must add up to 100%.";
+    }
   }
   return null;
 }
@@ -90,7 +95,10 @@ export function WillWizard() {
 
   async function handleNext() {
     const err = validateStep(currentStep, useWillStore.getState().data);
-    if (err) return toast.error(err);
+    if (err) {
+      toast.error(err);
+      return;
+    }
     await persist(currentStep + 1, false);
   }
   async function handleBack() {
@@ -101,7 +109,10 @@ export function WillWizard() {
   }
   async function handleFinish() {
     const err = validateAll(useWillStore.getState().data);
-    if (err) return toast.error(err);
+    if (err) {
+      toast.error(err);
+      return;
+    }
     await persist(currentStep, true);
     toast.success("Your will is complete.");
     router.push("/review");
@@ -168,11 +179,21 @@ export function WillWizard() {
             Back
           </Button>
           {isReview ? (
-            <Button onClick={handleFinish} disabled={save.isPending} iconRight={<ArrowRight size={16} />}>
+            <Button
+              onClick={handleFinish}
+              disabled={save.isPending}
+              loading={save.isPending}
+              iconRight={<ArrowRight size={16} />}
+            >
               {save.isPending ? "Saving…" : "Finish & review"}
             </Button>
           ) : (
-            <Button onClick={handleNext} disabled={save.isPending} iconRight={<ArrowRight size={16} />}>
+            <Button
+              onClick={handleNext}
+              disabled={save.isPending}
+              loading={save.isPending}
+              iconRight={<ArrowRight size={16} />}
+            >
               {save.isPending ? "Saving…" : "Next"}
             </Button>
           )}

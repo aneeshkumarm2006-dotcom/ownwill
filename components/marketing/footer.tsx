@@ -26,8 +26,8 @@ export function Footer() {
               A warm, plain-language way to make a will, power of attorney, and asset list. Built in Canada.
             </p>
             <div className="row g-2 mt-2">
-              <a className="btn btn-outline btn-sm btn-icon" aria-label="Twitter" href="#"><Sparkles size={16} /></a>
-              <a className="btn btn-outline btn-sm btn-icon" aria-label="Email" href="#"><Mail size={16} /></a>
+              <a className="btn btn-outline btn-sm btn-icon" aria-label="Twitter" href="#"><Sparkles size={16} aria-hidden="true" focusable={false} /></a>
+              <a className="btn btn-outline btn-sm btn-icon" aria-label="Email" href="#"><Mail size={16} aria-hidden="true" focusable={false} /></a>
             </div>
           </div>
           <Col title="Product" items={[

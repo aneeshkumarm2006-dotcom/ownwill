@@ -44,13 +44,22 @@ export const hasPerson = (p: Person): boolean =>
 
 // --- Repeating items (stored as JSONB arrays) ---
 
+/** Stable per-item identifier used as React `key`. Generated on creation,
+ *  preserved across edits, persisted with the row so refresh keeps the key. */
+const newId = (): string =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
 export interface Beneficiary {
+  _id: string;
   name: string;
   relationship: string;
   percentage: number;
   dob: string;
 }
 export const emptyBeneficiary = (): Beneficiary => ({
+  _id: newId(),
   name: "",
   relationship: "",
   percentage: 0,
@@ -58,35 +67,41 @@ export const emptyBeneficiary = (): Beneficiary => ({
 });
 
 export interface Child {
+  _id: string;
   name: string;
   dob: string;
 }
-export const emptyChild = (): Child => ({ name: "", dob: "" });
+export const emptyChild = (): Child => ({ _id: newId(), name: "", dob: "" });
 
 export interface Pet {
+  _id: string;
   name: string;
   type: string;
   breed: string;
 }
-export const emptyPet = (): Pet => ({ name: "", type: "", breed: "" });
+export const emptyPet = (): Pet => ({ _id: newId(), name: "", type: "", breed: "" });
 
 export interface SpecificGift {
+  _id: string;
   item: string;
   recipient_name: string;
   recipient_relationship: string;
 }
 export const emptyGift = (): SpecificGift => ({
+  _id: newId(),
   item: "",
   recipient_name: "",
   recipient_relationship: "",
 });
 
 export interface CharitableDonation {
+  _id: string;
   organization: string;
   amount: number;
   is_percentage: boolean;
 }
 export const emptyDonation = (): CharitableDonation => ({
+  _id: newId(),
   organization: "",
   amount: 0,
   is_percentage: false,
@@ -121,11 +136,16 @@ export interface WillForm {
   business_interests: string;
 }
 
-/** True if the person was born less than 18 years ago. */
-export function isMinor(dob: string): boolean {
-  if (!dob) return false;
+/**
+ * Returns true if the person was born less than 18 years ago, false if 18+,
+ * or null if `dob` is empty or unparseable. Callers must distinguish "known
+ * adult" from "unknown" — a guardian-prompt UI should treat null as "no info
+ * yet" rather than silently behaving as if the child is an adult.
+ */
+export function isMinor(dob: string): boolean | null {
+  if (!dob) return null;
   const birth = new Date(dob);
-  if (Number.isNaN(birth.getTime())) return false;
+  if (Number.isNaN(birth.getTime())) return null;
   const now = new Date();
   let age = now.getFullYear() - birth.getFullYear();
   const m = now.getMonth() - birth.getMonth();
@@ -134,7 +154,7 @@ export function isMinor(dob: string): boolean {
 }
 
 export const hasMinorChild = (children: Child[]): boolean =>
-  children.some((c) => isMinor(c.dob));
+  children.some((c) => isMinor(c.dob) === true);
 
 export const beneficiaryTotal = (beneficiaries: Beneficiary[]): number =>
   beneficiaries.reduce((sum, b) => sum + (Number(b.percentage) || 0), 0);

@@ -1,6 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/server";
+import { apiOk, apiError } from "@/lib/api/response";
 
 /**
  * Stripe webhook receiver. Verifies the signature, then (TODO) updates the
@@ -11,9 +12,7 @@ export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature");
 
-  if (!signature) {
-    return NextResponse.json({ error: "Missing signature" }, { status: 400 });
-  }
+  if (!signature) return apiError("Missing signature", 400);
 
   let event: Stripe.Event;
   try {
@@ -24,10 +23,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";
-    return NextResponse.json(
-      { error: `Webhook signature verification failed: ${message}` },
-      { status: 400 },
-    );
+    return apiError(`Webhook signature verification failed: ${message}`, 400);
   }
 
   switch (event.type) {
@@ -39,5 +35,5 @@ export async function POST(req: NextRequest) {
       break;
   }
 
-  return NextResponse.json({ received: true });
+  return apiOk({ received: true });
 }

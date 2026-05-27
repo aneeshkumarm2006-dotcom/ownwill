@@ -27,9 +27,80 @@ export function Dropdown({
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const popRef = useRef<HTMLDivElement | null>(null);
-  const selected = options.find((o) => o.value === value);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const selectedIndex = options.findIndex((o) => o.value === value);
+  const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
+  const [activeIndex, setActiveIndex] = useState<number>(selectedIndex >= 0 ? selectedIndex : 0);
 
   useEffect(() => setMounted(true), []);
+
+  // When opening, start active item at the current selection (or first).
+  useEffect(() => {
+    if (!open) return;
+    const start = selectedIndex >= 0 ? selectedIndex : 0;
+    setActiveIndex(start);
+    requestAnimationFrame(() => {
+      optionRefs.current[start]?.focus();
+    });
+  }, [open, selectedIndex]);
+
+  function moveActive(delta: number) {
+    if (options.length === 0) return;
+    setActiveIndex((i) => {
+      const next = (i + delta + options.length) % options.length;
+      requestAnimationFrame(() => optionRefs.current[next]?.focus());
+      return next;
+    });
+  }
+
+  function onTriggerKeyDown(e: React.KeyboardEvent<HTMLButtonElement>) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setOpen(true);
+    }
+  }
+
+  function onListKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        moveActive(1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        moveActive(-1);
+        break;
+      case "Home":
+        e.preventDefault();
+        setActiveIndex(0);
+        requestAnimationFrame(() => optionRefs.current[0]?.focus());
+        break;
+      case "End": {
+        e.preventDefault();
+        const last = options.length - 1;
+        setActiveIndex(last);
+        requestAnimationFrame(() => optionRefs.current[last]?.focus());
+        break;
+      }
+      case "Enter":
+      case " ": {
+        e.preventDefault();
+        const o = options[activeIndex];
+        if (o) {
+          onChange(o.value);
+          setOpen(false);
+          requestAnimationFrame(() => triggerRef.current?.focus());
+        }
+        break;
+      }
+      case "Escape":
+      case "Tab":
+        e.preventDefault();
+        setOpen(false);
+        requestAnimationFrame(() => triggerRef.current?.focus());
+        break;
+    }
+  }
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -68,6 +139,7 @@ export function Dropdown({
         id={id}
         className="ow-trigger"
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={onTriggerKeyDown}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -82,6 +154,8 @@ export function Dropdown({
                 ref={popRef}
                 className="ow-pop"
                 role="listbox"
+                tabIndex={-1}
+                onKeyDown={onListKeyDown}
                 style={{
                   position: "fixed",
                   top: pos.top,
@@ -92,17 +166,23 @@ export function Dropdown({
                   padding: 6,
                 }}
               >
-                {options.map((o) => (
+                {options.map((o, i) => (
                   <button
                     key={o.value}
+                    ref={(el) => {
+                      optionRefs.current[i] = el;
+                    }}
                     type="button"
                     role="option"
                     aria-selected={o.value === value}
+                    tabIndex={i === activeIndex ? 0 : -1}
                     className="ow-opt"
                     onClick={() => {
                       onChange(o.value);
                       setOpen(false);
+                      requestAnimationFrame(() => triggerRef.current?.focus());
                     }}
+                    onMouseEnter={() => setActiveIndex(i)}
                   >
                     <span>{o.label}</span>
                     {o.value === value && <Check size={16} />}

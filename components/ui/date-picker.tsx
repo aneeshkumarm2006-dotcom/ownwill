@@ -44,7 +44,6 @@ export function DatePicker({
       const left = Math.min(Math.max(8, r.left), vw - popW - 8);
       setPos({ top, left, width: r.width });
     };
-    update();
     requestAnimationFrame(update);
     window.addEventListener("scroll", update, true);
     window.addEventListener("resize", update);

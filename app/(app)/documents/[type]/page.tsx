@@ -7,20 +7,26 @@ import { loadDoc } from "@/lib/docs/data";
 import { renderDocument, DOCUMENT_CSS, DOCUMENT_TITLES } from "@/lib/docs/document";
 import { PrintButton } from "@/components/will/print-button";
 import { DownloadPdfButton } from "@/components/will/download-pdf-button";
+import type { DocumentType } from "@/types";
 
-const TABLE: Record<string, string> = {
+const TABLE: Record<Exclude<DocumentType, "will">, string> = {
   poa_health: "poa_health_data",
   poa_property: "poa_property_data",
   asset_list: "asset_list_data",
 };
+
+function isDocumentType(value: string): value is DocumentType {
+  return value in DOCUMENT_TITLES;
+}
 
 export default async function DocumentViewPage({
   params,
 }: {
   params: Promise<{ type: string }>;
 }) {
-  const { type } = await params;
-  if (!DOCUMENT_TITLES[type]) notFound();
+  const { type: rawType } = await params;
+  if (!isDocumentType(rawType)) notFound();
+  const type: DocumentType = rawType;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

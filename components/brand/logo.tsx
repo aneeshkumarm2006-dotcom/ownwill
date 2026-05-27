@@ -1,5 +1,7 @@
 /** OwnWill leaf wordmark — soft drop-leaf with a coral signature vein. */
 
+import { memo } from "react";
+
 export function LeafMark({
   size = 28,
   color,
@@ -43,7 +45,7 @@ export function LeafMark({
   );
 }
 
-export function Wordmark({
+function WordmarkBase({
   size = 22,
   mono = false,
 }: {
@@ -61,3 +63,5 @@ export function Wordmark({
     </span>
   );
 }
+
+export const Wordmark = memo(WordmarkBase);

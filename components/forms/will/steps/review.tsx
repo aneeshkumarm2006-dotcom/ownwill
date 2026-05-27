@@ -12,14 +12,37 @@ import {
 
 function Section({
   title,
+  editStep,
   children,
 }: {
   title: string;
+  editStep?: number;
   children: React.ReactNode;
 }) {
+  const setStep = useWillStore((s) => s.setStep);
   return (
     <section className="space-y-1 border-b py-3 last:border-b-0">
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {editStep !== undefined ? (
+          <button
+            type="button"
+            onClick={() => setStep(editStep)}
+            className="t-caption focusable"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--primary)",
+              cursor: "pointer",
+              padding: 0,
+              textDecoration: "underline",
+              fontFamily: "inherit",
+            }}
+          >
+            Edit
+          </button>
+        ) : null}
+      </div>
       <div className="text-sm text-muted-foreground">{children}</div>
     </section>
   );
@@ -45,28 +68,25 @@ export function ReviewStep() {
         Review your answers below. You can go back to make changes.
       </p>
 
-      <Section title="Personal">
+      <Section title="Personal" editStep={1}>
         {data.full_legal_name || "—"}
         {" · "}
         {data.city ? `${data.city}, ` : ""}
         {provinceName(data.province)}
       </Section>
 
-      <Section title="Executor">
-        {personLine(data.executor)}
+      <Section title="Executor" editStep={2}>
+        <div>{personLine(data.executor)}</div>
         {hasPerson(data.backup_executor) ? (
-          <>
-            <br />
-            Backup: {personLine(data.backup_executor)}
-          </>
+          <div className="mt-1">Backup: {personLine(data.backup_executor)}</div>
         ) : null}
       </Section>
 
-      <Section title="Beneficiaries">
+      <Section title="Beneficiaries" editStep={3}>
         {data.beneficiaries.length === 0
           ? "None"
-          : data.beneficiaries.map((b, i) => (
-              <div key={i}>
+          : data.beneficiaries.map((b) => (
+              <div key={b._id}>
                 {b.name || "Unnamed"} — {b.percentage}%
                 {b.relationship ? ` (${b.relationship})` : ""}
               </div>
@@ -76,11 +96,11 @@ export function ReviewStep() {
         ) : null}
       </Section>
 
-      <Section title="Children">
+      <Section title="Children" editStep={4}>
         {data.children.length === 0
           ? "None"
-          : data.children.map((c, i) => (
-              <div key={i}>
+          : data.children.map((c) => (
+              <div key={c._id}>
                 {c.name || "Unnamed"}
                 {c.dob && isMinor(c.dob) ? " (minor)" : ""}
               </div>
@@ -90,11 +110,11 @@ export function ReviewStep() {
         ) : null}
       </Section>
 
-      <Section title="Pets">
+      <Section title="Pets" editStep={5}>
         {data.pets.length === 0
           ? "None"
-          : data.pets.map((p, i) => (
-              <div key={i}>
+          : data.pets.map((p) => (
+              <div key={p._id}>
                 {p.name || "Unnamed"}
                 {p.type ? ` — ${p.type}` : ""}
               </div>
@@ -107,28 +127,28 @@ export function ReviewStep() {
         ) : null}
       </Section>
 
-      <Section title="Specific gifts">
+      <Section title="Specific gifts" editStep={6}>
         {data.specific_gifts.length === 0
           ? "None"
-          : data.specific_gifts.map((g, i) => (
-              <div key={i}>
+          : data.specific_gifts.map((g) => (
+              <div key={g._id}>
                 {g.item || "Item"} → {g.recipient_name || "recipient"}
               </div>
             ))}
       </Section>
 
-      <Section title="Charitable donations">
+      <Section title="Charitable donations" editStep={7}>
         {data.charitable_donations.length === 0
           ? "None"
-          : data.charitable_donations.map((d, i) => (
-              <div key={i}>
+          : data.charitable_donations.map((d) => (
+              <div key={d._id}>
                 {d.organization || "Organization"} —{" "}
                 {d.is_percentage ? `${d.amount}%` : `$${d.amount}`}
               </div>
             ))}
       </Section>
 
-      <Section title="Wishes">
+      <Section title="Wishes" editStep={8}>
         {data.funeral_wishes || data.business_interests
           ? "Provided"
           : "None added"}

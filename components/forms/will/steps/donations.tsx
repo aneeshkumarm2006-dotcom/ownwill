@@ -56,9 +56,13 @@ export function DonationsStep() {
               <Field label="Gift type">
                 <NativeSelect
                   value={item.is_percentage ? "percentage" : "amount"}
-                  onChange={(e) =>
-                    update({ is_percentage: e.target.value === "percentage" })
-                  }
+                  onChange={(e) => {
+                    const nextIsPercentage = e.target.value === "percentage";
+                    if (nextIsPercentage === item.is_percentage) return;
+                    // A "$5,000" amount makes no sense as "5,000% of the estate" —
+                    // clear the field so the user re-enters in the new unit.
+                    update({ is_percentage: nextIsPercentage, amount: 0 });
+                  }}
                 >
                   <option value="amount">Fixed amount</option>
                   <option value="percentage">Percentage of estate</option>

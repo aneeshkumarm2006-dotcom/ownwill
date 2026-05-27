@@ -22,14 +22,29 @@ export function ChildrenStep() {
   const [hasChildren, setHasChildren] = useState(data.children.length > 0);
 
   const toggle = (v: boolean) => {
-    setHasChildren(v);
     if (!v) {
+      const hasGuardianData =
+        data.children.length > 0 ||
+        Boolean(data.guardian.first_name || data.guardian.last_name) ||
+        Boolean(data.backup_guardian.first_name || data.backup_guardian.last_name);
+      if (
+        hasGuardianData &&
+        !window.confirm(
+          "Switching to “No children” will remove the children and guardians you've entered. Continue?",
+        )
+      ) {
+        return;
+      }
+      setHasChildren(false);
       patch({
         children: [],
         guardian: emptyPerson(),
         backup_guardian: emptyPerson(),
       });
-    } else if (data.children.length === 0) {
+      return;
+    }
+    setHasChildren(true);
+    if (data.children.length === 0) {
       patch({ children: [emptyChild()] });
     }
   };

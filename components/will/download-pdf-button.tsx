@@ -25,12 +25,29 @@ export function DownloadPdfButton({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ type }),
       });
-      const json = await res.json();
-      if (!res.ok) {
+      const json = (await res.json()) as
+        | { ok: true; data: { url: string } }
+        | { ok: false; error: string };
+      if (!json.ok) {
         toast.error(json.error || "Couldn't generate the PDF. Try the print view.");
         return;
       }
-      window.open(json.url, "_blank");
+
+      const pdfRes = await fetch(json.data.url);
+      if (!pdfRes.ok) {
+        toast.error("Couldn't download the PDF. Try the print view.");
+        return;
+      }
+      const blob = await pdfRes.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = `${type}.pdf`;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch {
       toast.error("Couldn't reach the PDF service. Try the print view.");
     } finally {

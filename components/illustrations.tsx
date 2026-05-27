@@ -33,7 +33,7 @@ export function PaperFold() {
         <rect x="22" y="28" width="80" height="10" rx="4" fill="var(--teal-800)" />
         <rect x="22" y="46" width="120" height="4" rx="2" fill="var(--sand-300)" />
         {[70, 84, 98, 116, 130, 144, 162, 176].map((y, i) => (
-          <rect key={i} x="22" y={y} width={i % 3 === 2 ? 100 : 158} height="4" rx="2" fill="var(--sand-300)" />
+          <rect key={y} x="22" y={y} width={i % 3 === 2 ? 100 : 158} height="4" rx="2" fill="var(--sand-300)" />
         ))}
         <path d="M30 210 q15 -16 30 0 t30 0 t30 0 t30 0" fill="none" stroke="var(--coral-500)" strokeWidth="2" strokeLinecap="round" pathLength={100}
           style={{ strokeDasharray: 100, strokeDashoffset: 0, animation: "mg-sig 4s var(--ease-emph) infinite" }} />

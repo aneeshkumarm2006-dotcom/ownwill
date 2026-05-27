@@ -22,6 +22,22 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+-- profiles.email: backfill from auth.users, then enforce NOT NULL so downstream
+-- code (email send, profile self-heal) can stop null-checking.
+update public.profiles p
+   set email = u.email
+  from auth.users u
+ where p.id = u.id and (p.email is null or p.email = '');
+alter table public.profiles alter column email set not null;
+
+-- profiles.partner_profile_id: linking two spouses shouldn't block deleting
+-- one of them. Default FK action is NO ACTION (errors); switch to SET NULL.
+alter table public.profiles
+  drop constraint if exists profiles_partner_profile_id_fkey;
+alter table public.profiles
+  add constraint profiles_partner_profile_id_fkey
+  foreign key (partner_profile_id) references public.profiles(id) on delete set null;
+
 -- ============================================================
 -- provinces (reference)
 -- ============================================================
@@ -342,3 +358,63 @@ begin
     execute format('create policy "own rows delete" on public.%I for delete using (auth.uid() = user_id);', t);
   end loop;
 end $$;
+
+-- ============================================================
+-- Additional indexes — every FK that's filtered/ordered in queries.
+-- Postgres doesn't auto-index FKs; without these, lookups do seq scans
+-- as soon as the tables have any real volume.
+-- ============================================================
+create index if not exists profiles_partner_profile_id_idx
+  on public.profiles (partner_profile_id);
+
+create index if not exists will_data_user_id_idx          on public.will_data (user_id);
+create index if not exists poa_health_data_user_id_idx    on public.poa_health_data (user_id);
+create index if not exists poa_property_data_user_id_idx  on public.poa_property_data (user_id);
+create index if not exists asset_list_data_user_id_idx    on public.asset_list_data (user_id);
+
+create index if not exists payments_user_id_idx           on public.payments (user_id, created_at desc);
+create index if not exists email_logs_user_id_idx         on public.email_logs (user_id, sent_at desc);
+create index if not exists signing_instructions_user_id_idx
+  on public.signing_instructions (user_id, emailed_at desc);
+create index if not exists signing_instructions_document_id_idx
+  on public.signing_instructions (document_id);
+
+-- ============================================================
+-- Storage bucket RLS — the `documents` bucket is public-readable for the
+-- generated PDF URL, but writes/updates/deletes must be confined to each
+-- user's own folder. Object path convention is `<user_id>/<file>` (see
+-- app/api/pdf/route.ts). The service_role bypasses RLS, so the server
+-- route still works; these policies block anon/authenticated abuse.
+-- ============================================================
+drop policy if exists "documents bucket public read" on storage.objects;
+create policy "documents bucket public read"
+  on storage.objects for select
+  using (bucket_id = 'documents');
+
+drop policy if exists "documents bucket owner insert" on storage.objects;
+create policy "documents bucket owner insert"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'documents'
+    and auth.uid()::text = split_part(name, '/', 1)
+  );
+
+drop policy if exists "documents bucket owner update" on storage.objects;
+create policy "documents bucket owner update"
+  on storage.objects for update to authenticated
+  using (
+    bucket_id = 'documents'
+    and auth.uid()::text = split_part(name, '/', 1)
+  )
+  with check (
+    bucket_id = 'documents'
+    and auth.uid()::text = split_part(name, '/', 1)
+  );
+
+drop policy if exists "documents bucket owner delete" on storage.objects;
+create policy "documents bucket owner delete"
+  on storage.objects for delete to authenticated
+  using (
+    bucket_id = 'documents'
+    and auth.uid()::text = split_part(name, '/', 1)
+  );
