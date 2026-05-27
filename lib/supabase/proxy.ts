@@ -14,6 +14,7 @@ const PROTECTED_PREFIXES = [
   "/signing",
   "/documents",
   "/help",
+  "/admin",
 ];
 
 /**

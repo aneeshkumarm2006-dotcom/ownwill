@@ -96,7 +96,7 @@ function toRow(form: WillForm): Row {
   };
 }
 
-function fromRow(row: Row): WillForm {
+export function fromRow(row: Row): WillForm {
   return {
     full_legal_name: (row.full_legal_name as string) ?? "",
     date_of_birth: (row.date_of_birth as string) ?? "",

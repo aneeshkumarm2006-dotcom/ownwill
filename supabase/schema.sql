@@ -418,3 +418,94 @@ create policy "documents bucket owner delete"
     bucket_id = 'documents'
     and auth.uid()::text = split_part(name, '/', 1)
   );
+
+-- ============================================================
+-- Admin: role on profiles + audit log
+-- ============================================================
+alter table public.profiles
+  add column if not exists role text not null default 'customer'
+  check (role in ('customer','support','admin','super_admin'));
+
+create index if not exists profiles_role_idx on public.profiles (role);
+
+create table if not exists public.admin_audit_log (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references public.profiles(id) on delete set null,
+  actor_email text,
+  action text not null,
+  target_type text,
+  target_id text,
+  metadata jsonb not null default '{}',
+  ip text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists admin_audit_log_actor_idx on public.admin_audit_log (actor_id, created_at desc);
+create index if not exists admin_audit_log_target_idx on public.admin_audit_log (target_type, target_id, created_at desc);
+create index if not exists admin_audit_log_action_idx on public.admin_audit_log (action, created_at desc);
+
+-- Lock audit log down: only service_role reads/writes (admin server code).
+alter table public.admin_audit_log enable row level security;
+revoke all on public.admin_audit_log from anon, authenticated;
+
+-- ============================================================
+-- Admin: document template versions (per type x province)
+-- ============================================================
+-- Each row is one reviewable version of a legal template body for one
+-- (document type, province). The "active" version is what the renderer
+-- pulls (once migration is done — currently TS-hardcoded). Lawyers move
+-- versions through draft -> in_review -> approved, then activate.
+create table if not exists public.document_template_versions (
+  id uuid primary key default gen_random_uuid(),
+  type text not null check (type in ('will','poa_health','poa_property','asset_list')),
+  province text not null references public.provinces(code),
+  version text not null,
+  status text not null default 'draft'
+    check (status in ('draft','in_review','approved','retired')),
+  body text not null default '',
+  change_notes text,
+  is_active boolean not null default false,
+  approved_by uuid references public.profiles(id) on delete set null,
+  approved_by_email text,
+  approved_at timestamptz,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists doc_template_versions_unique
+  on public.document_template_versions (type, province, version);
+
+-- Only one active version per (type, province). Partial unique enforces it.
+create unique index if not exists doc_template_versions_active
+  on public.document_template_versions (type, province)
+  where is_active;
+
+create index if not exists doc_template_versions_updated_idx
+  on public.document_template_versions (type, province, updated_at desc);
+
+alter table public.document_template_versions enable row level security;
+revoke all on public.document_template_versions from anon, authenticated;
+
+-- ============================================================
+-- Admin: app_settings (key-value config)
+-- ============================================================
+-- Simple kv store for operational settings (support email, disclaimer copy,
+-- maintenance mode, etc.) — anything the team needs to change without a deploy.
+-- All access via service-role (admin server code).
+create table if not exists public.app_settings (
+  key text primary key,
+  value jsonb not null default '{}',
+  updated_at timestamptz not null default now(),
+  updated_by uuid references public.profiles(id) on delete set null
+);
+
+alter table public.app_settings enable row level security;
+revoke all on public.app_settings from anon, authenticated;
+
+-- Seed defaults so the settings page renders cleanly on first load.
+insert into public.app_settings (key, value) values
+  ('support_email',     to_jsonb('support@ownwill.ca'::text)),
+  ('legal_disclaimer',  to_jsonb('OwnWill is not a law firm and does not provide legal advice. Documents generated through this service are templates only.'::text)),
+  ('maintenance_mode',  to_jsonb(false))
+on conflict (key) do nothing;
