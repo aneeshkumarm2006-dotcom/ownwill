@@ -23,7 +23,7 @@ export async function requireAdmin(): Promise<AdminUser> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/login?redirectTo=/admin");
+    redirect("/admin/login");
   }
 
   const { data: profile } = await supabase

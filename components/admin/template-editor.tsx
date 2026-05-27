@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui-kit";
-import { updateVersion } from "@/app/admin/templates/actions";
+import { updateVersion } from "@/app/admin/(authed)/templates/actions";
 
 export function TemplateEditor({
   id,

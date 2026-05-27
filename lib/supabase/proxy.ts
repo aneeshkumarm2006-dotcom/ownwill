@@ -70,14 +70,21 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  // /admin/login is the staff sign-in screen itself — must be reachable
+  // without a session, otherwise we'd loop on the redirect below.
+  const isAdminLogin = pathname === "/admin/login";
   // Exact match or trailing-slash match only — so "/willx" doesn't match "/will".
-  const isProtected = PROTECTED_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/"),
-  );
+  const isProtected =
+    !isAdminLogin &&
+    PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    // Admin routes bounce to the staff login so customer/staff entry points
+    // stay separate. Everything else uses the customer login.
+    const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+    url.pathname = isAdmin ? "/admin/login" : "/login";
     url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
   }

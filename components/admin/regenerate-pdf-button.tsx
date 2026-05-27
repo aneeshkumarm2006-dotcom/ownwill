@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui-kit";
-import { regeneratePdf } from "@/app/admin/documents/actions";
+import { regeneratePdf } from "@/app/admin/(authed)/documents/actions";
 
 export function RegeneratePdfButton({ documentId }: { documentId: string }) {
   const router = useRouter();

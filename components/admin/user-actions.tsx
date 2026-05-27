@@ -11,7 +11,7 @@ import {
   sendPasswordReset,
   setUserPlan,
   setUserSuspended,
-} from "@/app/admin/users/actions";
+} from "@/app/admin/(authed)/users/actions";
 
 type Plan = "none" | "essentials" | "premium" | "premium_x2";
 

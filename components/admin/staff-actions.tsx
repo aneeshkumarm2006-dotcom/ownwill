@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { UserPlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui-kit";
-import { grantStaffRole, revokeStaff } from "@/app/admin/staff/actions";
+import { grantStaffRole, revokeStaff } from "@/app/admin/(authed)/staff/actions";
 
 type Role = "support" | "admin" | "super_admin";
 

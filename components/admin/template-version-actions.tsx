@@ -10,7 +10,7 @@ import {
   activateVersion,
   retireVersion,
   submitForReview,
-} from "@/app/admin/templates/actions";
+} from "@/app/admin/(authed)/templates/actions";
 
 type Status = "draft" | "in_review" | "approved" | "retired";
 

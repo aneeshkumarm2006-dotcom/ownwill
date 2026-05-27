@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui-kit";
-import { createVersion } from "@/app/admin/templates/actions";
+import { createVersion } from "@/app/admin/(authed)/templates/actions";
 import type { DocType, ProvinceCode } from "@/lib/admin/templates";
 
 export function TemplateNewVersionButton({

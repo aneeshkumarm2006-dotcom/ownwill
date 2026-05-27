@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui-kit";
-import { updateSetting } from "@/app/admin/settings/actions";
+import { updateSetting } from "@/app/admin/(authed)/settings/actions";
 import type { SettingsMap } from "@/lib/admin/settings";
 
 export function SettingsForm({ initial }: { initial: SettingsMap }) {
