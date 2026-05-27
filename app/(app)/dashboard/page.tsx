@@ -98,14 +98,14 @@ function SmallDocCard({
 
 function AccountCard({ icon, title, sub, href }: { icon: React.ReactNode; title: string; sub: string; href: string }) {
   return (
-    <Link href={href} style={{ textDecoration: "none", color: "inherit" }}>
-      <Card interactive className="row g-3" style={{ alignItems: "center" }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--ink-700)" }}>{icon}</div>
-        <div style={{ flex: 1 }}>
+    <Link href={href} style={{ textDecoration: "none", color: "inherit", display: "block", height: "100%" }}>
+      <Card interactive className="row g-3" style={{ alignItems: "center", height: "100%" }}>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--ink-700)", flexShrink: 0 }}>{icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="t-h5">{title}</div>
           <div className="t-body-sm muted">{sub}</div>
         </div>
-        <ChevronRight style={{ color: "var(--muted-foreground)" }} size={18} />
+        <ChevronRight style={{ color: "var(--muted-foreground)", flexShrink: 0 }} size={18} />
       </Card>
     </Link>
   );
@@ -160,14 +160,11 @@ export default async function DashboardPage() {
     <AppPage
       breadcrumb="Home"
       title={`${greeting}, ${firstName}.`}
+      description="Pick up where you left off. Your progress saves automatically."
       actions={!hasPlan ? <Button variant="outline" size="sm" href="/billing" icon={<Sparkles size={16} />}>Upgrade</Button> : undefined}
       rail={rail}
       wide
     >
-      <p className="t-body muted" style={{ marginTop: -8, marginBottom: 24 }}>
-        Pick up where you left off. Your progress saves automatically.
-      </p>
-
       <FeaturedWill status={status} progress={progress} />
 
       <section style={{ marginTop: 32 }}>

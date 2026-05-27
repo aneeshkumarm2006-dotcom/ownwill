@@ -13,6 +13,7 @@ import { cls } from "@/lib/cls";
 export function AppPage({
   title,
   breadcrumb,
+  description,
   actions,
   rail,
   narrow,
@@ -22,6 +23,7 @@ export function AppPage({
 }: {
   title: string;
   breadcrumb?: string;
+  description?: ReactNode;
   actions?: ReactNode;
   rail?: ReactNode;
   narrow?: boolean;
@@ -47,10 +49,17 @@ export function AppPage({
       {bare ? (
         children
       ) : (
-        <div className={cls("ow-page-grid", !!rail && "has-rail", narrow && "is-narrow", !wide && "is-centered")}>
-          <div className="ow-page-body">{children}</div>
-          {rail && <aside className="ow-page-rail">{rail}</aside>}
-        </div>
+        <>
+          {description && (
+            <div className={cls("ow-page-description", !wide && "is-centered", narrow && "is-narrow")}>
+              <p className="t-body muted" style={{ margin: 0 }}>{description}</p>
+            </div>
+          )}
+          <div className={cls("ow-page-grid", !!rail && "has-rail", narrow && "is-narrow", !wide && "is-centered", description && "has-description")}>
+            <div className="ow-page-body">{children}</div>
+            {rail && <aside className="ow-page-rail">{rail}</aside>}
+          </div>
+        </>
       )}
     </div>
   );
