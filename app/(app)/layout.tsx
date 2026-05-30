@@ -1,8 +1,15 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { acceptInvitation } from "@/lib/pro/actions";
+import { isMaintenanceMode } from "@/lib/admin/maintenance";
+import { loadSettings } from "@/lib/admin/settings";
 import { AppShell } from "@/components/app/app-shell";
 import { Alert } from "@/components/ui-kit";
+import { MaintenanceScreen } from "@/components/app/maintenance-screen";
 import type { ShellUser } from "@/components/app/shell-context";
+
+const PENDING_INVITE_COOKIE = "ow_pending_invite";
 
 export default async function AppLayout({
   children,
@@ -17,6 +24,30 @@ export default async function AppLayout({
   // Defense in depth: the proxy guards these routes too.
   if (!user) {
     redirect("/login");
+  }
+
+  // Maintenance gate (§7.5). The /login route lives outside (app), so a
+  // signed-out visitor can still reach the sign-in screen while the rest of
+  // the customer surface is blocked.
+  if (await isMaintenanceMode()) {
+    const { support_email } = await loadSettings();
+    return <MaintenanceScreen variant="customer" supportEmail={support_email} />;
+  }
+
+  // Consume a pending Pro invite if one was stashed before signup. We do this
+  // here (rather than in middleware) so the accept happens exactly once on
+  // the first authenticated render after sign-in. acceptInvitation handles
+  // re-entry safely (it no-ops on already-consumed tokens), so a race where
+  // the cookie outlives the accept won't double-write.
+  const cookieStore = await cookies();
+  const pendingInvite = cookieStore.get(PENDING_INVITE_COOKIE)?.value;
+  if (pendingInvite) {
+    cookieStore.set(PENDING_INVITE_COOKIE, "", { path: "/", maxAge: 0 });
+    const accepted = await acceptInvitation(pendingInvite);
+    // Staff invites should land the user in /pro, not the customer shell.
+    if (!accepted.error && accepted.data?.kind === "staff") {
+      redirect("/pro/dashboard");
+    }
   }
 
   let plan: ShellUser["plan"] = "none";

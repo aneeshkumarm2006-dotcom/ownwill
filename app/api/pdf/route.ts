@@ -110,5 +110,16 @@ export async function POST(req: NextRequest) {
     .update({ pdf_url: pub.publicUrl, pdf_generated_at: new Date().toISOString(), status: "generated" })
     .eq("id", documentId);
 
+  // Pro webhook fan-out for "we just rendered a fresh PDF" — useful for firms
+  // that want to push the artifact into their own document store.
+  void (async () => {
+    try {
+      const { fireDocumentEvent } = await import("@/lib/pro/webhooks");
+      await fireDocumentEvent({ type: "document.generated", documentId });
+    } catch (e) {
+      console.error("[webhook] pdf.generated dispatch failed", e);
+    }
+  })();
+
   return apiOk({ url: pub.publicUrl });
 }

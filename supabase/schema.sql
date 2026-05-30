@@ -509,3 +509,229 @@ insert into public.app_settings (key, value) values
   ('legal_disclaimer',  to_jsonb('OwnWill is not a law firm and does not provide legal advice. Documents generated through this service are templates only.'::text)),
   ('maintenance_mode',  to_jsonb(false))
 on conflict (key) do nothing;
+
+-- ============================================================
+-- Pro / B2B: organizations + members + clients + invitations
+-- ============================================================
+-- A firm (advisor, funeral home, law firm, employer) that uses OwnWill as a
+-- product surface for their own clients/employees. All access is gated through
+-- server actions using the service-role client; RLS is locked down below.
+create table if not exists public.organizations (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,
+  name text not null,
+  type text not null check (type in ('advisor','funeral','law','employer','other')),
+  status text not null default 'active' check (status in ('active','suspended','closed')),
+  -- Branding (Phase 1: logo only; primary_color reserved for Phase 4)
+  logo_url text,
+  primary_color text,
+  -- Billing (populated by Phase 3 Stripe wiring)
+  billing_email text,
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  seat_count integer not null default 1,
+  plan text default 'pro_starter' check (plan in ('pro_starter','pro_team','pro_enterprise')),
+  -- Compliance / metadata
+  licensing_number text,
+  address text,
+  city text,
+  province text references public.provinces(code),
+  postal_code text,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists organizations_slug_idx on public.organizations (slug);
+create index if not exists organizations_type_idx on public.organizations (type);
+
+-- Staff side: which people at the firm have access. Multi-org membership is
+-- allowed per Phase 0 decision #8 — no unique constraint on user_id alone; a
+-- single user can be a member of several firms. PK enforces one row per
+-- (org, user) pair.
+create table if not exists public.organization_members (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  role text not null default 'member' check (role in ('owner','admin','member','viewer')),
+  invited_email text,
+  invited_by uuid references public.profiles(id) on delete set null,
+  invited_at timestamptz default now(),
+  accepted_at timestamptz,
+  created_at timestamptz not null default now(),
+  primary key (organization_id, user_id)
+);
+create index if not exists org_members_user_idx on public.organization_members (user_id);
+
+-- Client side: which end-customers a given org manages. Soft revoke per Phase 0
+-- decision #7 — revocation flips status to 'revoked' and stamps revoked_at so
+-- the audit trail survives. A re-invite creates a new active row (only one
+-- active row per (org, user) — see partial unique index below).
+create table if not exists public.organization_clients (
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  added_by uuid references public.profiles(id) on delete set null,
+  status text not null default 'active' check (status in ('invited','active','revoked')),
+  invited_email text,
+  invited_at timestamptz default now(),
+  accepted_at timestamptz,
+  revoked_at timestamptz,
+  notes text,
+  created_at timestamptz not null default now(),
+  primary key (organization_id, user_id)
+);
+create index if not exists org_clients_user_idx on public.organization_clients (user_id);
+create index if not exists org_clients_status_idx on public.organization_clients (organization_id, status);
+
+-- Only one *active* org per client at a time. Lets a client switch firms over
+-- time (history preserved via 'revoked' rows) without ambiguity about who is
+-- currently managing them.
+create unique index if not exists org_clients_one_active
+  on public.organization_clients (user_id)
+  where status = 'active';
+
+-- Pending invitations: emailed to people before they have an account.
+-- `kind` distinguishes staff invites (consumed into organization_members) from
+-- client invites (consumed into organization_clients). 14-day expiry default.
+create table if not exists public.organization_invitations (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  email text not null,
+  kind text not null check (kind in ('staff','client')),
+  role text check (role in ('owner','admin','member','viewer')),
+  token text not null unique,
+  invited_by uuid references public.profiles(id) on delete set null,
+  expires_at timestamptz not null default (now() + interval '14 days'),
+  accepted_at timestamptz,
+  accepted_user_id uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists org_invitations_email_idx on public.organization_invitations (lower(email));
+create index if not exists org_invitations_org_idx on public.organization_invitations (organization_id, created_at desc);
+
+-- RLS lockdown — all access through server actions using service-role.
+-- Customer-side reads (e.g. the "Managed by X" badge on the customer dashboard)
+-- also go through server actions, so anon/authenticated never touch these.
+alter table public.organizations enable row level security;
+alter table public.organization_members enable row level security;
+alter table public.organization_clients enable row level security;
+alter table public.organization_invitations enable row level security;
+revoke all on public.organizations from anon, authenticated;
+revoke all on public.organization_members from anon, authenticated;
+revoke all on public.organization_clients from anon, authenticated;
+revoke all on public.organization_invitations from anon, authenticated;
+
+-- admin_audit_log is reused for Pro actions; namespace with the 'pro.*' action
+-- prefix (pro.org.*, pro.client.*, pro.staff.*, pro.billing.*). No schema
+-- change needed here.
+
+-- ------------------------------------------------------------
+-- Phase 3 — Billing columns. Added separately so existing rows keep working
+-- without backfill; nullable everywhere. `subscription_status` mirrors the
+-- Stripe subscription lifecycle so the app can tell "billing not started" from
+-- "past due" without re-hitting the API.
+alter table public.organizations
+  add column if not exists subscription_status text
+    check (subscription_status in (
+      'incomplete','incomplete_expired','trialing','active',
+      'past_due','canceled','unpaid','paused'
+    )),
+  add column if not exists stripe_price_id text,
+  add column if not exists current_period_end timestamptz,
+  add column if not exists cancel_at_period_end boolean not null default false;
+
+create index if not exists organizations_stripe_customer_idx
+  on public.organizations (stripe_customer_id)
+  where stripe_customer_id is not null;
+create index if not exists organizations_stripe_subscription_idx
+  on public.organizations (stripe_subscription_id)
+  where stripe_subscription_id is not null;
+
+-- ------------------------------------------------------------
+-- Phase 4 — White-label branding. `logo_path` stores the storage object path
+-- inside the private `org-logos` bucket; we mint short-lived signed URLs at
+-- send-time rather than persisting public URLs (mirrors the documents-bucket
+-- hardening pattern). `logo_url` from the original schema is now deprecated —
+-- new code reads/writes `logo_path` only.
+alter table public.organizations
+  add column if not exists logo_path text;
+
+-- Org-logos bucket: private (signed URLs only). Service-role bypasses RLS, and
+-- we intentionally add no anon/authenticated policies — Pro settings actions
+-- are the only writer, and signed URLs are the only reader path.
+insert into storage.buckets (id, name, public)
+values ('org-logos', 'org-logos', false)
+on conflict (id) do nothing;
+
+-- ============================================================
+-- Phase 5 — Integrations: webhooks + REST API keys
+-- ============================================================
+-- Outbound webhook endpoints registered by a firm. We POST signed JSON on
+-- document lifecycle events (completed / generated). Signing secret is a
+-- random 32-byte value stored verbatim; the firm reads it once in /pro/settings
+-- and uses it to verify our HMAC-SHA256 header on incoming requests.
+create table if not exists public.organization_webhooks (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  url text not null,
+  description text,
+  events text[] not null default array['document.completed','document.generated']::text[],
+  signing_secret text not null,
+  status text not null default 'active' check (status in ('active','disabled')),
+  -- Health stats — updated by the dispatcher so the UI can warn on a dead URL.
+  last_delivery_at timestamptz,
+  last_success_at timestamptz,
+  consecutive_failures integer not null default 0,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists org_webhooks_org_idx
+  on public.organization_webhooks (organization_id, status);
+
+-- Per-attempt audit of webhook fires. Kept compact (status code + truncated
+-- response body) so a chatty endpoint doesn't blow up storage. Retries reuse
+-- this table — the same (webhook_id, event_id, attempt) tuple is unique.
+create table if not exists public.organization_webhook_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  webhook_id uuid not null references public.organization_webhooks(id) on delete cascade,
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  event_id uuid not null,
+  event_type text not null,
+  attempt integer not null default 1,
+  status text not null check (status in ('success','failed','pending')),
+  http_status integer,
+  response_excerpt text,
+  error text,
+  delivered_at timestamptz not null default now(),
+  unique (webhook_id, event_id, attempt)
+);
+create index if not exists org_webhook_deliveries_webhook_idx
+  on public.organization_webhook_deliveries (webhook_id, delivered_at desc);
+create index if not exists org_webhook_deliveries_org_idx
+  on public.organization_webhook_deliveries (organization_id, delivered_at desc);
+
+-- REST API keys. We only persist the SHA-256 hash; the plaintext key is shown
+-- once at generation time. `prefix` is the first 8 chars of the plaintext so
+-- the UI can render a recognisable label without exposing the secret.
+create table if not exists public.organization_api_keys (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  name text not null,
+  prefix text not null,
+  key_hash text not null,
+  scopes text[] not null default array['read']::text[],
+  last_used_at timestamptz,
+  revoked_at timestamptz,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists org_api_keys_hash_idx
+  on public.organization_api_keys (key_hash);
+create index if not exists org_api_keys_org_idx
+  on public.organization_api_keys (organization_id, revoked_at);
+
+alter table public.organization_webhooks enable row level security;
+alter table public.organization_webhook_deliveries enable row level security;
+alter table public.organization_api_keys enable row level security;
+revoke all on public.organization_webhooks from anon, authenticated;
+revoke all on public.organization_webhook_deliveries from anon, authenticated;
+revoke all on public.organization_api_keys from anon, authenticated;

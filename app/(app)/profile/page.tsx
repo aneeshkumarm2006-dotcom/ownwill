@@ -1,85 +1,34 @@
-"use client";
-
-import { useState } from "react";
-import { toast } from "sonner";
-import { Download, Info, Save, Trash2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/server";
+import { getFirmStaffViewHistory, getManagedByOrg } from "@/lib/pro/customer";
 import { AppPage } from "@/components/app/app-page";
-import { useShell } from "@/components/app/shell-context";
-import { Button, Card, Field, Input, Textarea } from "@/components/ui-kit";
-import { Dropdown } from "@/components/ui/dropdown";
-import { PROVINCE_OPTIONS, type Province } from "@/types";
+import { ProfileForm, ProfileRail } from "@/components/profile/profile-form";
+import { FirmAccessCard } from "@/components/profile/firm-access-card";
 
-export default function ProfilePage() {
-  const { user } = useShell();
-  const [name, setName] = useState(user.fullName);
-  const [province, setProvince] = useState<string>(user.province);
-  const [address, setAddress] = useState("");
-  const [saving, setSaving] = useState(false);
+export const metadata = { title: "Your profile — OwnWill" };
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    const supabase = createClient();
-    const { data: { user: u } } = await supabase.auth.getUser();
-    if (u) {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ full_name: name, province, address })
-        .eq("id", u.id);
-      if (error) {
-        toast.error(error.message);
-        setSaving(false);
-        return;
-      }
-    }
-    setSaving(false);
-    toast.success("Profile saved.");
-  }
+export default async function ProfilePage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const rail = (
-    <div className="stack g-4">
-      <Card className="stack g-3">
-        <div className="t-h5">Why we ask</div>
-        <div className="t-body-sm muted">Your legal name appears on every document. Your province determines which signing rules we use.</div>
-      </Card>
-      <Card className="stack g-3" style={{ background: "var(--info-bg)", borderColor: "var(--teal-200)" }}>
-        <div className="row g-2"><Info size={18} style={{ color: "var(--info)" }} /><div className="t-h5" style={{ margin: 0 }}>Encrypted</div></div>
-        <div className="t-body-sm" style={{ color: "var(--ink-800)" }}>Your data is encrypted at rest and in transit. You can export or delete it any time.</div>
-      </Card>
-    </div>
-  );
+  // The (app) layout already redirects unauthenticated visitors, but guard
+  // anyway so the type narrowing for `user!` below is honest.
+  const managedBy = user ? await getManagedByOrg(user.id) : null;
+  const events = user && managedBy ? await getFirmStaffViewHistory(user.id, 10) : [];
 
   return (
-    <AppPage breadcrumb="Account" title="Your profile" actions={<Button size="sm" onClick={save} icon={<Save size={14} />}>Save changes</Button>} rail={rail} narrow>
-      <form onSubmit={save} className="stack g-4">
-        <Card className="stack g-4">
-          <div className="t-h4">Personal</div>
-          <Field label="Full legal name" required>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <Field label="Email" required>
-            <Input type="email" value={user.email} readOnly />
-          </Field>
-          <Field label="Province" required hint="Your will follows your province's rules.">
-            <Dropdown value={province} onChange={(v) => setProvince(v as Province)} options={PROVINCE_OPTIONS} placeholder="Choose…" />
-          </Field>
-          <Field label="Home address" hint="Used on your will. Stored encrypted.">
-            <Textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder={"123 Maple St, Apt 4\nToronto, ON M5V 2T6"} />
-          </Field>
-        </Card>
-        <Card className="stack g-3">
-          <div className="t-h4">Your data</div>
-          <p className="t-body-sm muted">Export everything, or delete your account.</p>
-          <div className="row g-3" style={{ flexWrap: "wrap" }}>
-            <Button variant="outline" type="button" icon={<Download size={16} />}>Export my data</Button>
-            <Button variant="ghost" type="button" style={{ color: "var(--destructive)" }} icon={<Trash2 size={16} />}>Delete account</Button>
-          </div>
-        </Card>
-        <Button type="submit" size="lg" loading={saving} style={{ alignSelf: "flex-start" }}>
-          {saving ? "Saving…" : "Save changes"}
-        </Button>
-      </form>
+    <AppPage breadcrumb="Account" title="Your profile" rail={<ProfileRail />} narrow>
+      <div className="stack g-4">
+        {managedBy && (
+          <FirmAccessCard
+            orgName={managedBy.name}
+            acceptedAt={managedBy.acceptedAt}
+            events={events}
+          />
+        )}
+        <ProfileForm />
+      </div>
     </AppPage>
   );
 }

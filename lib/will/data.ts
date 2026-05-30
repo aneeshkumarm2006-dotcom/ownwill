@@ -226,5 +226,20 @@ export async function saveWill(
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", args.documentId);
     if (docErr) throw docErr;
+
+    // Fire-and-forget Pro webhook. Import dynamically so a webhook module
+    // failure never breaks a save (and customer-side bundlers can tree-shake
+    // the node:crypto import paths).
+    void (async () => {
+      try {
+        const { fireDocumentEvent } = await import("@/lib/pro/webhooks");
+        await fireDocumentEvent({
+          type: "document.completed",
+          documentId: args.documentId,
+        });
+      } catch (e) {
+        console.error("[webhook] will.completed dispatch failed", e);
+      }
+    })();
   }
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Briefcase,
   Check,
   ChevronRight,
   CreditCard,
@@ -14,6 +15,7 @@ import {
   User,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getManagedByOrg } from "@/lib/pro/customer";
 import { AppPage } from "@/components/app/app-page";
 import { Badge, Button, Card } from "@/components/ui-kit";
 import { PaperFold } from "@/components/illustrations";
@@ -115,9 +117,10 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: willDoc }] = await Promise.all([
+  const [{ data: profile }, { data: willDoc }, managedBy] = await Promise.all([
     supabase.from("profiles").select("plan, full_name").eq("id", user!.id).maybeSingle(),
     supabase.from("documents").select("id, status").eq("user_id", user!.id).eq("type", "will").eq("is_current", true).maybeSingle(),
+    getManagedByOrg(user!.id),
   ]);
 
   let progress = 0;
@@ -139,6 +142,21 @@ export default async function DashboardPage() {
 
   const rail = (
     <div className="stack g-4">
+      {managedBy && (
+        <Card className="stack g-3" style={{ background: "var(--teal-50)", borderColor: "var(--teal-200)" }}>
+          <div className="row g-2">
+            <Briefcase size={18} style={{ color: "var(--teal-700)" }} />
+            <div className="t-h5" style={{ margin: 0 }}>Managed by {managedBy.name}</div>
+          </div>
+          <div className="t-body-sm" style={{ color: "var(--ink-800)" }}>
+            Staff at {managedBy.name} can see your progress and help you finish. You
+            stay in control of your documents.
+          </div>
+          <Button variant="outline" size="sm" href="/profile" style={{ alignSelf: "flex-start" }}>
+            Manage access
+          </Button>
+        </Card>
+      )}
       <Card className="stack g-3">
         <div className="row g-2"><Sparkles size={18} style={{ color: "var(--coral-500)" }} /><div className="t-h5" style={{ margin: 0 }}>Did you know?</div></div>
         <div className="t-body-sm muted">Six in ten Canadians don&apos;t have a will. Yours will be done in an afternoon.</div>

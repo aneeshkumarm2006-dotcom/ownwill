@@ -89,6 +89,20 @@ export async function saveDoc(
       .from("documents")
       .update({ status: "generated", completed_at: now, pdf_generated_at: now })
       .eq("id", args.documentId);
+
+    // Pro webhook fan-out. Fire-and-forget; never let webhook plumbing block
+    // a save the customer initiated.
+    void (async () => {
+      try {
+        const { fireDocumentEvent } = await import("@/lib/pro/webhooks");
+        await fireDocumentEvent({
+          type: "document.generated",
+          documentId: args.documentId,
+        });
+      } catch (e) {
+        console.error("[webhook] doc.generated dispatch failed", e);
+      }
+    })();
   }
 }
 

@@ -15,7 +15,28 @@ const PROTECTED_PREFIXES = [
   "/documents",
   "/help",
   "/admin",
+  // Pro / B2B authed surface. `/pro` (marketing), `/pro/login`,
+  // `/pro/signup`, and `/pro/invite/[token]` stay public — those are carved
+  // out below the same way `/admin/login` is for the admin entry point.
+  "/pro/dashboard",
+  "/pro/clients",
+  "/pro/team",
+  "/pro/billing",
+  "/pro/settings",
+  "/pro/audit",
 ];
+
+/**
+ * Pro entry points that must stay reachable without a session. Mirrors the
+ * `/admin/login` carve-out — without these, an anon visitor trying to sign up
+ * or accept an invite would loop on the redirect below.
+ */
+const PRO_PUBLIC_PATHS = ["/pro", "/pro/login", "/pro/signup"];
+function isProPublic(pathname: string): boolean {
+  if (PRO_PUBLIC_PATHS.includes(pathname)) return true;
+  // /pro/invite/<token> — the token is opaque, so prefix-match the parent.
+  return pathname.startsWith("/pro/invite/");
+}
 
 /**
  * Refreshes the Supabase auth session on every matched request and guards the
@@ -71,20 +92,23 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // /admin/login is the staff sign-in screen itself — must be reachable
-  // without a session, otherwise we'd loop on the redirect below.
+  // /admin/login + the public /pro entry points must be reachable without a
+  // session, otherwise we'd loop on the redirect below.
   const isAdminLogin = pathname === "/admin/login";
+  const isProPublicPath = isProPublic(pathname);
   // Exact match or trailing-slash match only — so "/willx" doesn't match "/will".
   const isProtected =
     !isAdminLogin &&
+    !isProPublicPath &&
     PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
-    // Admin routes bounce to the staff login so customer/staff entry points
-    // stay separate. Everything else uses the customer login.
+    // Admin and Pro routes bounce to their own login screens so the three
+    // entry points (customer / admin / Pro) stay separate.
     const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
-    url.pathname = isAdmin ? "/admin/login" : "/login";
+    const isPro = pathname.startsWith("/pro/");
+    url.pathname = isAdmin ? "/admin/login" : isPro ? "/pro/login" : "/login";
     url.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(url);
   }
